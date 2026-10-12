@@ -228,7 +228,7 @@
 
             <!-- Compact Search Bar -->
             <div class="flex gap-1.5 mb-3 shrink-0">
-                <input type="text" id="dictQueryInput" placeholder="단어 입력 (예: apple)" 
+                <input type="text" id="dictQueryInput" placeholder="단어 입력 (예: apple)" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"
                        onkeyup="if(event.key==='Enter') lookupDictionaryWord()"
                        class="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs focus:outline-none focus:border-indigo-500 font-medium">
                 <button onclick="lookupDictionaryWord()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl transition shadow-md shrink-0">
@@ -342,23 +342,23 @@
                             <i class="fa-solid fa-wand-magic-sparkles text-amber-500"></i> AI로 자동 채우기
                         </button>
                     </div>
-                    <input type="text" id="editWordInput" placeholder="예: apple" autocomplete="off" autocorrect="off" spellcheck="false" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-semibold">
+                    <input type="text" id="editWordInput" placeholder="예: apple" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-semibold">
                 </div>
                 <div>
                     <label class="block font-bold text-slate-700 mb-1">발음기호 (Phonetic)</label>
-                    <input type="text" id="editPhoneticInput" placeholder="자동 생성 또는 직접 입력" autocomplete="off" autocorrect="off" spellcheck="false" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-mono">
+                    <input type="text" id="editPhoneticInput" placeholder="자동 생성 또는 직접 입력" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-mono">
                 </div>
                 <div>
                     <label class="block font-bold text-slate-700 mb-1">뜻 (Meaning)</label>
-                    <input type="text" id="editMeaningInput" placeholder="자동 생성 또는 직접 입력" autocomplete="off" autocorrect="off" spellcheck="false" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500">
+                    <input type="text" id="editMeaningInput" placeholder="자동 생성 또는 직접 입력" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500">
                 </div>
                 <div>
                     <label class="block font-bold text-slate-700 mb-1">영어 예문 (Example En)</label>
-                    <input type="text" id="editExampleEnInput" placeholder="자동 생성 또는 직접 입력" autocomplete="off" autocorrect="off" spellcheck="false" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500">
+                    <input type="text" id="editExampleEnInput" placeholder="자동 생성 또는 직접 입력" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500">
                 </div>
                 <div>
                     <label class="block font-bold text-slate-700 mb-1">예문 해석 (Example Ko)</label>
-                    <input type="text" id="editExampleKoInput" placeholder="자동 생성 또는 직접 입력" autocomplete="off" autocorrect="off" spellcheck="false" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500">
+                    <input type="text" id="editExampleKoInput" placeholder="자동 생성 또는 직접 입력" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500">
                 </div>
             </div>
 
@@ -381,6 +381,7 @@
 
         let wordsData = [];
         let currentIndex = 0;
+        let currentDeckId = null;
         let currentDeckTitle = "";
 
         // Test mode states
@@ -408,41 +409,55 @@
             localStorage.setItem('saved_word_decks', JSON.stringify(decks));
         }
 
-        function saveDeckToHistory(title, words) {
+        function saveDeckToHistory(title, words, specificDeckId = null) {
             if (!words || words.length === 0) return;
             let decks = getSavedDecks();
-            const deckName = title || currentDeckTitle || "단어장";
-            
-            const existingIdx = decks.findIndex(d => d.title === deckName);
             const now = new Date();
             const dateStr = now.toLocaleDateString('ko-KR');
             const timeStr = now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
 
-            const isFav = existingIdx >= 0 ? (decks[existingIdx].isFavorite || false) : false;
-
-            const deckData = {
-                id: existingIdx >= 0 ? decks[existingIdx].id : Date.now(),
-                title: deckName,
-                date: dateStr,
-                time: timeStr,
-                count: words.length,
-                words: words,
-                isFavorite: isFav
-            };
+            let targetId = specificDeckId !== null ? specificDeckId : currentDeckId;
+            let existingIdx = targetId ? decks.findIndex(d => d.id === targetId) : -1;
 
             if (existingIdx >= 0) {
-                decks[existingIdx] = deckData;
+                decks[existingIdx].title = title || decks[existingIdx].title;
+                decks[existingIdx].words = words;
+                decks[existingIdx].count = words.length;
+                decks[existingIdx].date = dateStr;
+                decks[existingIdx].time = timeStr;
+                currentDeckId = decks[existingIdx].id;
+                currentDeckTitle = decks[existingIdx].title;
             } else {
-                decks.unshift(deckData);
+                const newId = Date.now();
+                const defaultTitle = title && title.trim() !== "" ? title : `단어장 ${decks.length + 1}`;
+                const newDeck = {
+                    id: newId,
+                    title: defaultTitle,
+                    date: dateStr,
+                    time: timeStr,
+                    count: words.length,
+                    words: words,
+                    isFavorite: false
+                };
+                decks.unshift(newDeck);
+                currentDeckId = newId;
+                currentDeckTitle = defaultTitle;
             }
 
-            // Enforce strict maximum 20 decks limit across all decks (including favorites)
+            // Enforce max 20 decks limit (including favorites)
             if (decks.length > 20) {
-                decks = decks.slice(0, 20);
+                let favorites = decks.filter(d => d.isFavorite);
+                let nonFavorites = decks.filter(d => !d.isFavorite);
+                
+                if (favorites.length >= 20) {
+                    decks = favorites.slice(0, 20);
+                } else {
+                    const slotsLeft = 20 - favorites.length;
+                    decks = [...favorites, ...nonFavorites.slice(0, slotsLeft)];
+                }
             }
 
             saveDecksToStorage(decks);
-            currentDeckTitle = deckName;
         }
 
         function openHistoryModal() {
@@ -463,7 +478,7 @@
                 container.innerHTML = `
                     <div class="text-center py-8 text-slate-400">
                         <i class="fa-solid fa-folder-open text-3xl mb-2 text-slate-300"></i>
-                        <p class="text-xs">저장된 단어장이 없습니다.<br>사진을 업로드하면 자동으로 최근 단어장이 보관됩니다.</p>
+                        <p class="text-xs">저장된 단어장이 없습니다.<br>사진을 업로드하면 자동으로 단어장이 보관됩니다.</p>
                     </div>
                 `;
                 return;
@@ -533,7 +548,7 @@
             if (newTitle !== null && newTitle.trim() !== "") {
                 deck.title = newTitle.trim();
                 saveDecksToStorage(decks);
-                if (currentDeckTitle === deck.title) {
+                if (currentDeckId === id) {
                     currentDeckTitle = deck.title;
                 }
                 renderHistoryList();
@@ -545,6 +560,7 @@
             const selected = decks.find(d => d.id === id);
             if (selected && selected.words && selected.words.length > 0) {
                 wordsData = [...selected.words];
+                currentDeckId = selected.id;
                 currentDeckTitle = selected.title;
                 currentIndex = 0;
                 closeHistoryModal();
@@ -566,6 +582,8 @@
             document.getElementById('testView').classList.add('hidden');
             document.getElementById('testSummaryView').classList.add('hidden');
             document.getElementById('imageInput').value = '';
+            currentDeckId = null;
+            currentDeckTitle = "";
         }
 
         function getStoredApiKey() {
@@ -688,7 +706,6 @@
             } catch (err) {
                 console.error(err);
                 document.getElementById('dictLoading').classList.add('hidden');
-                alert("단어 검색 중 오류가 발생했습니다. API Key를 올바르게 입력했는지 확인해 주세요.\n(" + err.message + ")");
             }
         }
 
@@ -705,10 +722,9 @@
             if (!currentDictWord) return;
             wordsData.push(currentDictWord);
             currentIndex = wordsData.length - 1;
-            saveDeckToHistory(currentDeckTitle, wordsData);
+            saveDeckToHistory(currentDeckTitle, wordsData, currentDeckId);
             showCardView();
             closeDictionaryModal();
-            alert(`"${currentDictWord.word}" 단어가 학습 단어장에 추가되었습니다!`);
         }
 
         async function handleImageUpload(event) {
@@ -731,7 +747,6 @@
                     await extractWordsFromImage(base64Data, file.type, apiKey);
                 } catch (err) {
                     console.error("Extraction error:", err);
-                    alert("단어 추출 중 오류가 발생했습니다: " + err.message);
                     backToUpload();
                 }
             };
@@ -782,11 +797,7 @@
 
             if (!response.ok) {
                 const errText = await response.text();
-                if (response.status === 429) {
-                    throw new Error("API 사용량 한도(Quota)를 초과했습니다. 잠시 후 다시 시도하거나 새 API Key를 발급받아 주세요.");
-                } else {
-                    throw new Error(`API 오류 (${response.status}): ${errText}`);
-                }
+                throw new Error(`API 오류 (${response.status}): ${errText}`);
             }
 
             const result = await response.json();
@@ -797,8 +808,10 @@
                 if (Array.isArray(parsed) && parsed.length > 0) {
                     wordsData = parsed;
                     currentIndex = 0;
+                    currentDeckId = null;
                     
-                    const autoTitle = "단어장";
+                    const decks = getSavedDecks();
+                    const autoTitle = `단어장 ${decks.length + 1}`;
                     saveDeckToHistory(autoTitle, wordsData);
 
                     showCardView();
@@ -1098,7 +1111,7 @@
                 if (currentIndex >= wordsData.length) {
                     currentIndex = wordsData.length - 1;
                 }
-                saveDeckToHistory(currentDeckTitle, wordsData);
+                saveDeckToHistory(currentDeckTitle, wordsData, currentDeckId);
                 renderCard();
                 renderWordList();
             }
@@ -1131,10 +1144,7 @@
 
         async function autoFillWordInfo() {
             const word = document.getElementById('editWordInput').value.trim();
-            if (!word) {
-                alert("자동 채우기를 진행할 단어를 먼저 입력해 주세요.");
-                return;
-            }
+            if (!word) return;
 
             const apiKey = getStoredApiKey();
             if (!apiKey) {
@@ -1187,12 +1197,9 @@
                     if (data.meaning) document.getElementById('editMeaningInput').value = data.meaning;
                     if (data.exampleEn) document.getElementById('editExampleEnInput').value = data.exampleEn;
                     if (data.exampleKo) document.getElementById('editExampleKoInput').value = data.exampleKo;
-                } else {
-                    throw new Error("정보를 찾을 수 없습니다.");
                 }
             } catch (err) {
                 console.error(err);
-                alert("AI 자동 채우기 중 오류가 발생했습니다. API Key를 확인해 주세요.");
             } finally {
                 btn.disabled = false;
                 btn.innerHTML = originalText;
@@ -1210,10 +1217,7 @@
             const exampleEn = document.getElementById('editExampleEnInput').value.trim();
             const exampleKo = document.getElementById('editExampleKoInput').value.trim();
 
-            if (!word) {
-                alert("단어를 입력해 주세요.");
-                return;
-            }
+            if (!word) return;
 
             const newWordObj = {
                 word: word,
@@ -1230,7 +1234,7 @@
                 currentIndex = wordsData.length - 1;
             }
 
-            saveDeckToHistory(currentDeckTitle, wordsData);
+            saveDeckToHistory(currentDeckTitle, wordsData, currentDeckId);
 
             closeWordEditorModal();
             showCardView();
