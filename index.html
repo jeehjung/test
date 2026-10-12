@@ -314,7 +314,7 @@
                     <i class="fa-solid fa-triangle-exclamation"></i> API 안내
                 </p>
                 <p class="leading-relaxed text-amber-700">
-                    무료 요금제(Gemini 2.5 Flash)를 이용합니다.<br>
+                    무료 요금제(Gemini 3.8 Flash)를 이용합니다.<br>
                     사용량 한도 초과(HTTP 429) 시 잠시 후 다시 시도해 주세요.
                 </p>
             </div>
@@ -392,7 +392,7 @@
 
     <script>
         const HARDCODED_API_KEY = ""; 
-        const GEMINI_MODEL = "gemini-2.5-flash";
+        const GEMINI_MODEL = "gemini-3.8-flash";
         let editingWordIdx = -1;
 
         let wordsData = [];
@@ -793,7 +793,7 @@
             return arr;
         }
 
-        // ================= SPELL TEST LOGIC (UPDATED) =================
+        // ================= SPELL TEST LOGIC =================
         function startSpellTest(onlyIncorrect = false) {
             if (wordsData.length === 0) return;
 
