@@ -52,7 +52,7 @@
             </div>
             <h2 class="text-xl font-extrabold text-slate-900 mb-2">단어장 사진 업로드</h2>
             <p class="text-xs text-slate-500 mb-6 leading-relaxed">
-                공부할 영어 단어장이나 파닉스 교재 사진을 업로드하세요.<br>
+                공부할 영어 단어장 사진을 업로드하세요.<br>
                 Gemini AI가 단어, 발음기호, 뜻, 예문을 자동으로 추출합니다.
             </p>
 
@@ -170,7 +170,7 @@
 
                 <div class="mb-6">
                     <label class="block text-xs font-bold text-slate-700 mb-2 text-center">스펠링 입력</label>
-                    <input type="text" id="testSpellingInput" placeholder="단어를 입력하세요" onkeyup="if(event.key==='Enter') submitTestAnswer()" class="w-full text-center text-xl font-bold px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:border-purple-500 font-mono tracking-wider" autocomplete="off" spellcheck="false">
+                    <input type="text" id="testSpellingInput" placeholder="단어를 입력하세요" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" onkeyup="if(event.key==='Enter') submitTestAnswer()" class="w-full text-center text-xl font-bold px-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl focus:outline-none focus:border-purple-500 font-mono tracking-wider">
                 </div>
 
                 <div class="flex justify-center">
@@ -310,7 +310,7 @@
 
             <div class="mb-4">
                 <label class="block text-xs font-bold text-slate-700 mb-1">Gemini API Key</label>
-                <input type="password" id="apiKeyInput" placeholder="AIzaSy..." class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-indigo-500 font-mono">
+                <input type="password" id="apiKeyInput" placeholder="AIzaSy..." autocomplete="new-password" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-indigo-500 font-mono">
             </div>
 
             <div class="flex gap-2">
@@ -342,23 +342,23 @@
                             <i class="fa-solid fa-wand-magic-sparkles text-amber-500"></i> AI로 자동 채우기
                         </button>
                     </div>
-                    <input type="text" id="editWordInput" placeholder="예: apple (입력 후 AI 자동채우기 클릭)" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-semibold">
+                    <input type="text" id="editWordInput" placeholder="예: apple" autocomplete="off" autocorrect="off" spellcheck="false" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-semibold">
                 </div>
                 <div>
                     <label class="block font-bold text-slate-700 mb-1">발음기호 (Phonetic)</label>
-                    <input type="text" id="editPhoneticInput" placeholder="자동 생성 또는 직접 입력" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-mono">
+                    <input type="text" id="editPhoneticInput" placeholder="자동 생성 또는 직접 입력" autocomplete="off" autocorrect="off" spellcheck="false" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500 font-mono">
                 </div>
                 <div>
                     <label class="block font-bold text-slate-700 mb-1">뜻 (Meaning)</label>
-                    <input type="text" id="editMeaningInput" placeholder="자동 생성 또는 직접 입력" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500">
+                    <input type="text" id="editMeaningInput" placeholder="자동 생성 또는 직접 입력" autocomplete="off" autocorrect="off" spellcheck="false" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500">
                 </div>
                 <div>
                     <label class="block font-bold text-slate-700 mb-1">영어 예문 (Example En)</label>
-                    <input type="text" id="editExampleEnInput" placeholder="자동 생성 또는 직접 입력" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500">
+                    <input type="text" id="editExampleEnInput" placeholder="자동 생성 또는 직접 입력" autocomplete="off" autocorrect="off" spellcheck="false" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500">
                 </div>
                 <div>
                     <label class="block font-bold text-slate-700 mb-1">예문 해석 (Example Ko)</label>
-                    <input type="text" id="editExampleKoInput" placeholder="자동 생성 또는 직접 입력" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500">
+                    <input type="text" id="editExampleKoInput" placeholder="자동 생성 또는 직접 입력" autocomplete="off" autocorrect="off" spellcheck="false" class="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:border-indigo-500">
                 </div>
             </div>
 
@@ -733,7 +733,7 @@
         }
 
         async function extractWordsFromImage(base64Data, mimeType, apiKey) {
-            const systemPrompt = "You are an expert English teacher. Analyze the provided image of a vocabulary/phonics list. Extract all English words visible in the image. For each word, provide its IPA phonetic transcription (phonetic, e.g., [æpəl]), its Korean meaning (meaning), 1 simple example sentence in English (exampleEn), and its Korean translation (exampleKo). Output strictly in JSON format as an array of objects with keys: word, phonetic, meaning, exampleEn, exampleKo.";
+            const systemPrompt = "You are an expert English teacher. Analyze the provided image of a vocabulary list. Extract all English words visible in the image. For each word, provide its IPA phonetic transcription (phonetic, e.g., [æpəl]), its Korean meaning (meaning), 1 simple example sentence in English (exampleEn), and its Korean translation (exampleKo). Output strictly in JSON format as an array of objects with keys: word, phonetic, meaning, exampleEn, exampleKo.";
             const userQuery = "Extract all English words from this image along with phonetic transcriptions, meanings, and examples in JSON format.";
 
             const payload = {
