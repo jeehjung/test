@@ -427,13 +427,18 @@
         function saveDeckToHistory(title, words) {
             if (!words || words.length === 0) return;
             const decks = getSavedDecks();
-            const deckName = title || `단어장 (${new Date().toLocaleDateString('ko-KR')} ${new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'})})`;
+            const deckName = title || currentDeckTitle || "단어장";
             
             const existingIdx = decks.findIndex(d => d.title === deckName);
+            const now = new Date();
+            const dateStr = now.toLocaleDateString('ko-KR');
+            const timeStr = now.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+
             const deckData = {
                 id: existingIdx >= 0 ? decks[existingIdx].id : Date.now(),
                 title: deckName,
-                date: new Date().toLocaleDateString('ko-KR'),
+                date: dateStr,
+                time: timeStr,
                 count: words.length,
                 words: words
             };
@@ -476,6 +481,8 @@
                     ? deck.words.slice(0, 3).map(w => w.word).join(', ') + (deck.words.length > 3 ? ' 외' : '')
                     : '단어 없음';
 
+                const dateTimeDisplay = (deck.date && deck.time) ? `${deck.date} ${deck.time}` : (deck.date || '');
+
                 const item = document.createElement('div');
                 item.className = "bg-slate-50 border border-slate-200 rounded-2xl p-3 flex items-center justify-between transition hover:border-amber-300";
                 item.innerHTML = `
@@ -485,7 +492,7 @@
                             <span class="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full font-bold shrink-0">${deck.count}개</span>
                         </div>
                         <p class="text-[11px] text-slate-500 mt-1 truncate font-medium"><span class="text-slate-400">포함 단어:</span> ${sampleWords}</p>
-                        <p class="text-[10px] text-slate-400 mt-0.5">${deck.date}</p>
+                        <p class="text-[10px] text-slate-400 mt-0.5">${dateTimeDisplay}</p>
                     </div>
                     <div class="flex items-center gap-1 shrink-0">
                         <button onclick="loadDeckFromHistory(${deck.id})" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold px-3 py-1.5 rounded-xl transition shadow-sm">
@@ -665,6 +672,7 @@
             if (!currentDictWord) return;
             wordsData.push(currentDictWord);
             currentIndex = wordsData.length - 1;
+            saveDeckToHistory(currentDeckTitle, wordsData);
             showCardView();
             closeDictionaryModal();
             alert(`"${currentDictWord.word}" 단어가 학습 단어장에 추가되었습니다!`);
@@ -757,7 +765,7 @@
                     wordsData = parsed;
                     currentIndex = 0;
                     
-                    const autoTitle = `단어장 (${new Date().toLocaleDateString('ko-KR')} ${new Date().toLocaleTimeString('ko-KR', {hour:'2-digit', minute:'2-digit'})})`;
+                    const autoTitle = "단어장";
                     saveDeckToHistory(autoTitle, wordsData);
 
                     showCardView();
@@ -1060,6 +1068,7 @@
                 if (currentIndex >= wordsData.length) {
                     currentIndex = wordsData.length - 1;
                 }
+                saveDeckToHistory(currentDeckTitle, wordsData);
                 renderCard();
                 renderWordList();
             }
@@ -1190,6 +1199,8 @@
                 wordsData.push(newWordObj);
                 currentIndex = wordsData.length - 1;
             }
+
+            saveDeckToHistory(currentDeckTitle, wordsData);
 
             closeWordEditorModal();
             showCardView();
