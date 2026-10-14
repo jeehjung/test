@@ -468,6 +468,21 @@
             });
         }
 
+        // Keep only one pending image and automatically expire abandoned jobs after 24 hours.
+        const PENDING_IMAGE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+        async function removeExpiredPendingImageJob() {
+            const job = await getPendingImageJob();
+            if (job && job.savedAt) {
+                const savedAt = Date.parse(job.savedAt);
+                if (!Number.isFinite(savedAt) || Date.now() - savedAt > PENDING_IMAGE_MAX_AGE_MS) {
+                    await clearPendingImageJob();
+                    return true;
+                }
+            }
+            return false;
+        }
+
         async function showPendingImageRecovery() {
             const panel = document.getElementById('pendingImageRecovery');
             if (!panel) return;
@@ -476,6 +491,7 @@
                 return;
             }
             try {
+                await removeExpiredPendingImageJob();
                 const job = await getPendingImageJob();
                 panel.classList.toggle('hidden', !job);
             } catch (err) {
@@ -884,6 +900,8 @@
                 imageRecognitionActive = true;
                 try {
                     // Save before starting the API request. If the page is killed, the image remains available for retry.
+                    // Replace any previous pending image before saving this one.
+                    await clearPendingImageJob();
                     await savePendingImageJob({
                         base64Data,
                         mimeType: file.type || 'image/jpeg',
