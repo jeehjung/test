@@ -241,7 +241,6 @@
                 <div class="w-7 h-7 border-3 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-2"></div>
                 <p class="text-xs text-slate-500 font-medium">사전 조회 중...</p>
             </div>
-            <div id="dictError" class="hidden text-xs text-rose-600 bg-rose-50 border border-rose-100 rounded-xl p-3 mb-3 shrink-0"></div>
 
             <!-- Result Display Area -->
             <div id="dictResultArea" class="hidden flex-1 overflow-y-auto min-h-0 bg-slate-50 rounded-2xl p-3 border border-slate-100 mb-3 space-y-2">
@@ -256,7 +255,7 @@
                 </div>
                 <div>
                     <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">의미 (Meaning)</span>
-                    <p id="dictResMeaning" class="text-xs font-semibold text-slate-800 mt-0.5 whitespace-pre-line">뜻 설명</p>
+                    <p id="dictResMeaning" class="text-xs font-semibold text-slate-800 mt-0.5">뜻 설명</p>
                 </div>
                 <div>
                     <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">예문 (Example)</span>
@@ -639,8 +638,6 @@
             document.getElementById('dictLoading').classList.add('hidden');
             document.getElementById('dictResultArea').classList.add('hidden');
             document.getElementById('dictAddAction').classList.add('hidden');
-            document.getElementById('dictError').classList.add('hidden');
-            document.getElementById('dictError').innerText = '';
             document.getElementById('dictionaryModal').classList.remove('hidden');
             document.getElementById('dictQueryInput').focus();
         }
@@ -649,150 +646,80 @@
             document.getElementById('dictionaryModal').classList.add('hidden');
         }
 
-        const DICTIONARY_API_BASE = "https://api.dictionaryapi.dev/api/v2/entries/en/";
-        const TRANSLATION_API_BASE = "https://api.mymemory.translated.net/get";
-        const DICTIONARY_CACHE_KEY = "spell_dictionary_cache_v1";
-        const DICTIONARY_CACHE_LIMIT = 100;
-
-        function readDictionaryCache() {
-            try {
-                return JSON.parse(localStorage.getItem(DICTIONARY_CACHE_KEY) || "{}");
-            } catch (e) {
-                return {};
-            }
-        }
-
-        function writeDictionaryCache(cache) {
-            const entries = Object.entries(cache);
-            const trimmed = Object.fromEntries(entries.slice(-DICTIONARY_CACHE_LIMIT));
-            try {
-                localStorage.setItem(DICTIONARY_CACHE_KEY, JSON.stringify(trimmed));
-            } catch (e) {
-                console.warn("사전 캐시를 저장하지 못했습니다.", e);
-            }
-        }
-
-        async function translateDictionaryText(text) {
-            if (!text || !text.trim()) return "";
-            const url = `${TRANSLATION_API_BASE}?q=${encodeURIComponent(text)}&langpair=en%7Cko`;
-            const response = await fetch(url);
-            if (!response.ok) throw new Error(`번역 API 요청 실패 (${response.status})`);
-            const data = await response.json();
-            const translated = data?.responseData?.translatedText;
-            if (!translated || data?.responseStatus >= 400) {
-                throw new Error("번역 결과가 없습니다.");
-            }
-            return translated.replace(/&#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, "&");
-        }
-
         async function lookupDictionaryWord() {
             const query = document.getElementById('dictQueryInput').value.trim();
             if (!query) return;
 
-            const normalizedQuery = query.toLowerCase();
-            const loadingEl = document.getElementById('dictLoading');
-            const resultEl = document.getElementById('dictResultArea');
-            const actionEl = document.getElementById('dictAddAction');
-            const errorEl = document.getElementById('dictError');
-            loadingEl.classList.remove('hidden');
-            resultEl.classList.add('hidden');
-            actionEl.classList.add('hidden');
-            errorEl.classList.add('hidden');
-            errorEl.innerText = "";
-
-            const cache = readDictionaryCache();
-            if (cache[normalizedQuery]) {
-                currentDictWord = cache[normalizedQuery];
-                displayDictionaryResult(currentDictWord);
-                loadingEl.classList.add('hidden');
-                resultEl.classList.remove('hidden');
-                actionEl.classList.remove('hidden');
+            const apiKey = getStoredApiKey();
+            if (!apiKey) {
+                openApiKeyModal();
                 return;
             }
 
-            try {
-                const response = await fetch(`${DICTIONARY_API_BASE}${encodeURIComponent(normalizedQuery)}`);
-                if (response.status === 404) {
-                    throw new Error("사전에서 단어를 찾지 못했습니다. 철자를 확인하거나 다른 단어로 검색해 주세요.");
-                }
-                if (!response.ok) {
-                    throw new Error(`영어 사전 요청 실패 (${response.status})`);
-                }
+            document.getElementById('dictLoading').classList.remove('hidden');
+            document.getElementById('dictResultArea').classList.add('hidden');
+            document.getElementById('dictAddAction').classList.add('hidden');
 
-                const entries = await response.json();
-                if (!Array.isArray(entries) || entries.length === 0) {
-                    throw new Error("사전에서 단어를 찾지 못했습니다.");
-                }
+            const systemPrompt = "You are a professional English dictionary and phonetic expert. Provide information for the requested word in strict JSON format with keys: word, phonetic (IPA format like [wɜːrd]), meaning (Korean meaning), exampleEn (simple example sentence in English), exampleKo (Korean translation of example).";
+            const userQuery = `Provide dictionary information for the word: "${query}" in JSON format.`;
 
-                const entry = entries[0];
-                const phonetic = entry.phonetic ||
-                    entry.phonetics?.find(p => p.text)?.text ||
-                    "[ - ]";
-                const definitions = [];
-                let exampleEn = "";
-
-                for (const item of entries) {
-                    for (const meaning of (item.meanings || [])) {
-                        for (const definition of (meaning.definitions || [])) {
-                            if (definition.definition && definitions.length < 3) {
-                                definitions.push({
-                                    partOfSpeech: meaning.partOfSpeech || "",
-                                    definition: definition.definition
-                                });
-                            }
-                            if (!exampleEn && definition.example) exampleEn = definition.example;
-                        }
+            const payload = {
+                contents: [{ role: "user", parts: [{ text: userQuery }] }],
+                generationConfig: {
+                    responseMimeType: "application/json",
+                    responseSchema: {
+                        type: "OBJECT",
+                        properties: {
+                            word: { type: "STRING" },
+                            phonetic: { type: "STRING" },
+                            meaning: { type: "STRING" },
+                            exampleEn: { type: "STRING" },
+                            exampleKo: { type: "STRING" }
+                        },
+                        propertyOrdering: ["word", "phonetic", "meaning", "exampleEn", "exampleKo"]
                     }
-                }
+                },
+                systemInstruction: { parts: [{ text: systemPrompt }] }
+            };
 
-                if (definitions.length === 0) {
-                    throw new Error("단어는 찾았지만 뜻풀이가 등록되어 있지 않습니다.");
-                }
-
-                const englishMeaning = definitions.map((item, index) =>
-                    `${index + 1}. ${item.partOfSpeech ? "[" + item.partOfSpeech + "] " : ""}${item.definition}`
-                ).join("\n");
-                const meaningPromise = translateDictionaryText(englishMeaning).catch(err => {
-                    console.warn("뜻 번역 실패:", err);
-                    return "한국어 뜻 번역에 실패했습니다.\n영어 뜻: " + englishMeaning;
+            try {
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
                 });
 
-                const exampleKoPromise = exampleEn
-                    ? translateDictionaryText(exampleEn).catch(err => {
-                        console.warn("예문 번역 실패:", err);
-                        return "예문 해석을 가져오지 못했습니다.";
-                    })
-                    : Promise.resolve("사전에 등록된 예문이 없습니다.");
+                if (!response.ok) {
+                    const errorDetails = await response.text();
+                    if (response.status === 429 || errorDetails.includes("RESOURCE_EXHAUSTED") || errorDetails.includes("quota")) {
+                        alert(OVERQUOTA_MSG);
+                    } else {
+                        alert(`API 요청 실패 (${response.status}): ${errorDetails}`);
+                    }
+                    throw new Error(`API 요청 실패 (${response.status}): ${errorDetails}`);
+                }
 
-                const [meaning, exampleKo] = await Promise.all([meaningPromise, exampleKoPromise]);
-                currentDictWord = {
-                    word: entry.word || query,
-                    phonetic,
-                    meaning,
-                    exampleEn: exampleEn || "사전에 등록된 예문이 없습니다.",
-                    exampleKo
-                };
+                const result = await response.json();
+                const text = result.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (text) {
+                    currentDictWord = JSON.parse(text);
+                    document.getElementById('dictResWord').innerText = currentDictWord.word;
+                    document.getElementById('dictResPhonetic').innerText = currentDictWord.phonetic || "[ - ]";
+                    document.getElementById('dictResMeaning').innerText = currentDictWord.meaning;
+                    document.getElementById('dictResExampleEn').innerText = currentDictWord.exampleEn;
+                    document.getElementById('dictResExampleKo').innerText = currentDictWord.exampleKo;
 
-                cache[normalizedQuery] = currentDictWord;
-                writeDictionaryCache(cache);
-                displayDictionaryResult(currentDictWord);
-                resultEl.classList.remove('hidden');
-                actionEl.classList.remove('hidden');
+                    document.getElementById('dictLoading').classList.add('hidden');
+                    document.getElementById('dictResultArea').classList.remove('hidden');
+                    document.getElementById('dictAddAction').classList.remove('hidden');
+                } else {
+                    throw new Error("결과를 찾을 수 없습니다.");
+                }
             } catch (err) {
-                console.error("사전 검색 오류:", err);
-                errorEl.innerText = err.message || "사전 검색 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.";
-                errorEl.classList.remove('hidden');
-            } finally {
-                loadingEl.classList.add('hidden');
+                console.error(err);
+                document.getElementById('dictLoading').classList.add('hidden');
             }
-        }
-
-        function displayDictionaryResult(item) {
-            document.getElementById('dictResWord').innerText = item.word || "";
-            document.getElementById('dictResPhonetic').innerText = item.phonetic || "[ - ]";
-            document.getElementById('dictResMeaning').innerText = item.meaning || "뜻을 찾을 수 없습니다.";
-            document.getElementById('dictResExampleEn').innerText = item.exampleEn || "사전에 등록된 예문이 없습니다.";
-            document.getElementById('dictResExampleKo').innerText = item.exampleKo || "예문 해석이 없습니다.";
         }
 
         function speakDictWord() {
