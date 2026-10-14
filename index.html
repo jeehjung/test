@@ -876,7 +876,7 @@
             }
             if (imageRecognitionActive) return;
 
-            showLoading("이미지를 안전하게 저장한 뒤 Gemini AI로 분석합니다...");
+            showLoading("이미지를 기기에 임시 저장했어요. Gemini AI로 인식 중...");
 
             const reader = new FileReader();
             reader.onload = async function(e) {
@@ -941,12 +941,21 @@
             };
 
             const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
-
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
+            // Avoid leaving the app stuck on the loading screen forever if the request stalls.
+            // The image stays in IndexedDB, so the user can retry after this timeout.
+            const controller = new AbortController();
+            const requestTimeout = setTimeout(() => controller.abort(), 120000);
+            let response;
+            try {
+                response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                    signal: controller.signal
+                });
+            } finally {
+                clearTimeout(requestTimeout);
+            }
 
             if (!response.ok) {
                 const errText = await response.text();
