@@ -56,6 +56,15 @@
                 Gemini AI가 단어, 발음기호, 뜻, 예문을 자동으로 추출합니다.
             </p>
 
+            <div id="pendingImageRecovery" class="hidden text-left bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-4">
+                <p class="text-sm font-bold text-amber-900 mb-1">이전 이미지 인식 작업이 남아 있어요</p>
+                <p class="text-xs text-amber-800 leading-relaxed mb-3">페이지가 닫히거나 브라우저가 중단된 경우, 저장된 이미지로 인식을 다시 시도할 수 있습니다. 재시도하면 Gemini API가 다시 호출됩니다.</p>
+                <div class="flex gap-2">
+                    <button type="button" onclick="resumePendingImageRecognition()" class="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-3 py-2.5 rounded-xl transition">인식 다시 시도</button>
+                    <button type="button" onclick="discardPendingImageRecognition()" class="bg-white hover:bg-amber-100 text-amber-800 border border-amber-200 font-bold text-xs px-3 py-2.5 rounded-xl transition">삭제</button>
+                </div>
+            </div>
+
             <label class="cursor-pointer w-full bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white font-bold py-3.5 px-6 rounded-2xl transition shadow-lg shadow-indigo-100 inline-flex items-center justify-center gap-2 text-sm">
                 <i class="fa-solid fa-image"></i>
                 <span>사진 선택 또는 촬영하기</span>
@@ -401,9 +410,124 @@
         // Current dictionary lookup cached word object
         let currentDictWord = null;
 
+        // Preserve the uploaded image in IndexedDB so a canceled/reloaded page can retry recognition.
+        const PENDING_IMAGE_DB_NAME = 'spell_image_progress_db';
+        const PENDING_IMAGE_STORE_NAME = 'jobs';
+        let imageRecognitionActive = false;
+
         window.addEventListener('DOMContentLoaded', () => {
             updateApiKeyUI();
+            showPendingImageRecovery();
         });
+
+        function openPendingImageDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(PENDING_IMAGE_DB_NAME, 1);
+                request.onupgradeneeded = () => {
+                    const db = request.result;
+                    if (!db.objectStoreNames.contains(PENDING_IMAGE_STORE_NAME)) {
+                        db.createObjectStore(PENDING_IMAGE_STORE_NAME);
+                    }
+                };
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error || new Error('이미지 저장소를 열 수 없습니다.'));
+            });
+        }
+
+        async function savePendingImageJob(job) {
+            const db = await openPendingImageDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(PENDING_IMAGE_STORE_NAME, 'readwrite');
+                tx.objectStore(PENDING_IMAGE_STORE_NAME).put(job, 'pending');
+                tx.oncomplete = () => { db.close(); resolve(); };
+                tx.onerror = () => { db.close(); reject(tx.error || new Error('이미지 저장에 실패했습니다.')); };
+                tx.onabort = () => { db.close(); reject(tx.error || new Error('이미지 저장이 취소되었습니다.')); };
+            });
+        }
+
+        async function getPendingImageJob() {
+            const db = await openPendingImageDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(PENDING_IMAGE_STORE_NAME, 'readonly');
+                const request = tx.objectStore(PENDING_IMAGE_STORE_NAME).get('pending');
+                request.onsuccess = () => resolve(request.result || null);
+                request.onerror = () => reject(request.error || new Error('저장된 이미지 상태를 읽을 수 없습니다.'));
+                tx.oncomplete = () => db.close();
+                tx.onerror = () => { db.close(); reject(tx.error || new Error('저장된 이미지 상태를 읽을 수 없습니다.')); };
+            });
+        }
+
+        async function clearPendingImageJob() {
+            const db = await openPendingImageDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(PENDING_IMAGE_STORE_NAME, 'readwrite');
+                tx.objectStore(PENDING_IMAGE_STORE_NAME).delete('pending');
+                tx.oncomplete = () => { db.close(); resolve(); };
+                tx.onerror = () => { db.close(); reject(tx.error || new Error('저장된 이미지 상태를 삭제할 수 없습니다.')); };
+                tx.onabort = () => { db.close(); reject(tx.error || new Error('저장된 이미지 상태 삭제가 취소되었습니다.')); };
+            });
+        }
+
+        async function showPendingImageRecovery() {
+            const panel = document.getElementById('pendingImageRecovery');
+            if (!panel) return;
+            if (imageRecognitionActive) {
+                panel.classList.add('hidden');
+                return;
+            }
+            try {
+                const job = await getPendingImageJob();
+                panel.classList.toggle('hidden', !job);
+            } catch (err) {
+                console.warn('저장된 이미지 작업을 확인하지 못했습니다.', err);
+                panel.classList.add('hidden');
+            }
+        }
+
+        async function resumePendingImageRecognition() {
+            if (imageRecognitionActive) return;
+            let job;
+            try {
+                job = await getPendingImageJob();
+            } catch (err) {
+                alert('저장된 이미지 작업을 불러오지 못했습니다. 새로 사진을 선택해 주세요.');
+                return;
+            }
+            if (!job) {
+                await showPendingImageRecovery();
+                return;
+            }
+
+            const apiKey = getStoredApiKey();
+            if (!apiKey || !apiKey.trim()) {
+                openApiKeyModal();
+                return;
+            }
+
+            imageRecognitionActive = true;
+            document.getElementById('pendingImageRecovery').classList.add('hidden');
+            showLoading('저장된 이미지로 인식을 다시 시도하는 중...');
+            try {
+                await extractWordsFromImage(job.base64Data, job.mimeType, apiKey);
+            } catch (err) {
+                console.error('이미지 인식 재시도 실패:', err);
+                backToUpload();
+            } finally {
+                imageRecognitionActive = false;
+                await showPendingImageRecovery();
+            }
+        }
+
+        async function discardPendingImageRecognition() {
+            if (imageRecognitionActive) return;
+            if (!confirm('저장된 이미지 인식 작업을 삭제할까요?')) return;
+            try {
+                await clearPendingImageJob();
+                await showPendingImageRecovery();
+            } catch (err) {
+                alert('저장된 작업을 삭제하지 못했습니다.');
+            }
+        }
 
         function getSavedDecks() {
             try {
@@ -750,18 +874,34 @@
                 event.target.value = '';
                 return;
             }
+            if (imageRecognitionActive) return;
 
-            showLoading("Gemini AI로 이미지 분석 및 단어 추출 중...");
+            showLoading("이미지를 안전하게 저장한 뒤 Gemini AI로 분석합니다...");
 
             const reader = new FileReader();
             reader.onload = async function(e) {
                 const base64Data = e.target.result.split(',')[1];
+                imageRecognitionActive = true;
                 try {
-                    await extractWordsFromImage(base64Data, file.type, apiKey);
+                    // Save before starting the API request. If the page is killed, the image remains available for retry.
+                    await savePendingImageJob({
+                        base64Data,
+                        mimeType: file.type || 'image/jpeg',
+                        savedAt: new Date().toISOString(),
+                        status: 'processing'
+                    });
+                    await extractWordsFromImage(base64Data, file.type || 'image/jpeg', apiKey);
                 } catch (err) {
                     console.error("Extraction error:", err);
                     backToUpload();
+                } finally {
+                    imageRecognitionActive = false;
+                    await showPendingImageRecovery();
                 }
+            };
+            reader.onerror = () => {
+                alert('이미지 파일을 읽지 못했습니다. 다시 선택해 주세요.');
+                backToUpload();
             };
             reader.readAsDataURL(file);
         }
@@ -832,6 +972,8 @@
                     const autoTitle = `단어장 ${decks.length + 1}`;
                     saveDeckToHistory(autoTitle, wordsData);
 
+                    // Clear the recovery payload only after the recognized words are saved.
+                    await clearPendingImageJob();
                     showCardView();
                     return;
                 }
